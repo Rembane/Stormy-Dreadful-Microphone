@@ -7,6 +7,7 @@ import Control.Monad
 import qualified Data.Attoparsec.Char8 as A
 import qualified Data.Bits as Bi
 import qualified Data.ByteString.Char8 as B
+import Data.List
 import Data.Maybe
 import Data.Word
 import System.Hardware.Serialport 
@@ -67,7 +68,7 @@ parseChunk port buf f = do
     where
         go (A.Fail _ _ _) = parseChunk port (fromMaybe "" $ A.maybeResult $ A.parse (cleaningParser >> A.skipWhile (== '~') >> A.takeByteString) buf) f
         go (A.Partial f') = parseChunk port "" f'
-        go d@(A.Done _ r) = return r
+        go (A.Done _ r)   = return r
 
 portName = "/dev/ttyUSB0"
 
@@ -76,7 +77,10 @@ main = do
     port <- openSerial portName defaultSerialSettings { commSpeed = CS115200 } 
     forever $ do
         b2 <- (parseChunk port "" (A.parse $ cleaningParser >> parseBenjaminUART)) 
-        print b2
-        print $ payload b2
-        print $ A.parse parseXYZ $ payload b2
+        -- print b2
+        -- print $ payload b2
+        let result = A.parse parseXYZ $ payload b2 
+        case result of 
+            (A.Done _ (GyroValues x y z)) -> putStrLn $ intercalate "\t" $ map show [x,y,z]
+            _                             -> putStrLn "Error"
     closeSerial port
